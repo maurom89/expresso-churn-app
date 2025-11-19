@@ -3,185 +3,230 @@ import pandas as pd
 import numpy as np
 import joblib
 import plotly.express as px
-import plotly.graph_objects as go
 
 # ============================================================
-# CONFIGURATION DE L'APP
+# CONFIGURATION GLOBALE
 # ============================================================
 st.set_page_config(
-    page_title="Expresso Churn – Dashboard & Prédiction",
+    page_title="Expresso Churn – App ML",
     page_icon="📱",
     layout="wide"
 )
 
 MODEL_PATH = "expresso_churn_model.joblib"
-DATA_PATH = "Expresso_churn_sample.csv"  # échantillon allégé
+DATA_PATH = "Expresso_churn_sample.csv"
+
 
 # ============================================================
-# FONCTIONS CACHÉES
+# CHARGEMENT DES RESSOURCES
 # ============================================================
-
 @st.cache_resource
 def load_model():
     return joblib.load(MODEL_PATH)
 
+
 @st.cache_data
-def load_sample():
+def load_data():
     df = pd.read_csv(DATA_PATH)
-    df["CHURN"] = df["CHURN"].astype(int)
+    if "CHURN" in df.columns:
+        df["CHURN"] = df["CHURN"].astype(int)
     return df
 
-# Charger modèle + données
+
 model = load_model()
-df_sample = load_sample()
+
 
 # ============================================================
-# BARRE LATERALE
+# SIDEBAR
 # ============================================================
 st.sidebar.title("📱 Expresso Churn App")
 st.sidebar.markdown("**RandomForest – entraîné sur 2,1 millions de clients**")
 
 page = st.sidebar.radio(
     "Navigation",
-    ["🔮 Prédiction du churn", "👀 Vue du dataset", "📊 Dashboard"]
+    ["🔮 Prédiction du churn", "👁️ Vue du dataset", "📊 Dashboard"]
 )
 
-# ============================================================
-# PAGE 1 – PRÉDICTION
-# ============================================================
 
+# ============================================================
+# PAGE 1 – PREDICTION
+# ============================================================
 if page == "🔮 Prédiction du churn":
     st.title("🔮 Prédiction du churn client")
-    st.markdown("""
-    Remplissez les informations du client ci-dessous pour obtenir  
-    la probabilité de désabonnement (**churn**).
-    """)
+
+    st.markdown("Remplissez les informations du client pour estimer la probabilité de **churn**.")
 
     col1, col2, col3 = st.columns(3)
 
-    # Variables catégorielles
-    REGION = col1.selectbox("Région", sorted(df_sample["REGION"].dropna().unique()))
-    TENURE = col1.selectbox("Ancienneté (TENURE)", sorted(df_sample["TENURE"].dropna().unique()))
-    MRG = col1.selectbox("MRG", ["NO", "YES"])
-    TOP_PACK = col1.text_input("Pack principal", "On-net 1000F=10MilF,10d")
+    # ----------------- variables catégorielles -----------------
+    with col1:
+        REGION = st.selectbox("RÉGION", sorted([
+            "DAKAR", "SAINT-LOUIS", "THIES", "FATICK", "KAOLACK",
+            "LOUGA", "DIOURBEL", "ZIGUINCHOR", "AUTRE"
+        ]))
 
-    # Numériques
-    MONTANT = col2.number_input("Montant rechargé", min_value=0.0, value=5000.0)
-    FREQUENCE_RECH = col2.number_input("Nombre de recharges", min_value=0.0, value=5.0)
-    DATA_VOLUME = col2.number_input("Volume Data", min_value=0.0, value=2000.0)
-    ON_NET = col2.number_input("Minutes On-Net", min_value=0.0, value=100.0)
+        TENURE = st.selectbox("Ancienneté (TENURE)", [
+            "A 1-3 month", "B 3-6 month", "C 6-9 month", "D 9-12 month",
+            "E 12-15 month", "F 15-18 month", "G 18-21 month",
+            "H 21-24 month", "K > 24 month"
+        ])
 
-    REVENUE = col3.number_input("Revenu généré", min_value=0.0, value=10000.0)
-    ARPU_SEGMENT = col3.number_input("ARPU Segment", min_value=0.0, value=1500.0)
-    FREQUENCE = col3.number_input("Fréquence globale", min_value=0.0, value=10.0)
-    ORANGE = col3.number_input("Minutes vers Orange", min_value=0.0, value=20.0)
-    TIGO = col3.number_input("Minutes vers Tigo", min_value=0.0, value=10.0)
-    REGULARITY = col3.number_input("Jours actifs", min_value=0, value=10)
-    FREQ_TOP_PACK = col3.number_input("Utilisation pack", min_value=0.0, value=2.0)
+        MRG = st.selectbox("MRG", ["NO", "YES"])
 
-    # DataFrame pour prédiction
-    X = pd.DataFrame([{
-        "REGION": REGION,
-        "TENURE": TENURE,
-        "MRG": MRG,
-        "TOP_PACK": TOP_PACK,
-        "MONTANT": MONTANT,
-        "FREQUENCE_RECH": FREQUENCE_RECH,
-        "REVENUE": REVENUE,
-        "ARPU_SEGMENT": ARPU_SEGMENT,
-        "FREQUENCE": FREQUENCE,
-        "DATA_VOLUME": DATA_VOLUME,
-        "ON_NET": ON_NET,
-        "ORANGE": ORANGE,
-        "TIGO": TIGO,
-        "REGULARITY": REGULARITY,
-        "FREQ_TOP_PACK": FREQ_TOP_PACK
-    }])
+        TOP_PACK = st.text_input("TOP_PACK", "On-net 200F=Unlimited_call24H")
+
+    # ----------------- variables numériques -----------------
+    with col2:
+        MONTANT = st.number_input("MONTANT", 0.0, step=500.0)
+        FREQUENCE_RECH = st.number_input("FREQUENCE_RECH", 0.0, step=1.0)
+        REVENUE = st.number_input("REVENUE", 0.0, step=500.0)
+        ARPU_SEGMENT = st.number_input("ARPU_SEGMENT", 0.0, step=100.0)
+        FREQUENCE = st.number_input("FREQUENCE", 0.0, step=1.0)
+
+    with col3:
+        DATA_VOLUME = st.number_input("DATA_VOLUME", 0.0, step=100.0)
+        ON_NET = st.number_input("ON_NET", 0.0, step=10.0)
+        ORANGE = st.number_input("ORANGE", 0.0, step=10.0)
+        TIGO = st.number_input("TIGO", 0.0, step=10.0)
+        REGULARITY = st.number_input("REGULARITY", 0, step=1)
+        FREQ_TOP_PACK = st.number_input("FREQ_TOP_PACK", 0.0, step=1.0)
+
+    # --- construction du dataframe
+    input_data = pd.DataFrame({
+        "REGION": [REGION],
+        "TENURE": [TENURE],
+        "MRG": [MRG],
+        "TOP_PACK": [TOP_PACK],
+        "MONTANT": [MONTANT],
+        "FREQUENCE_RECH": [FREQUENCE_RECH],
+        "REVENUE": [REVENUE],
+        "ARPU_SEGMENT": [ARPU_SEGMENT],
+        "FREQUENCE": [FREQUENCE],
+        "DATA_VOLUME": [DATA_VOLUME],
+        "ON_NET": [ON_NET],
+        "ORANGE": [ORANGE],
+        "TIGO": [TIGO],
+        "REGULARITY": [REGULARITY],
+        "FREQ_TOP_PACK": [FREQ_TOP_PACK],
+    })
 
     st.markdown("---")
 
     if st.button("🔍 Lancer la prédiction"):
-        proba = model.predict_proba(X)[0][1]
-        pred = model.predict(X)[0]
+        proba = float(model.predict_proba(input_data)[0][1])
+        pred = int(model.predict(input_data)[0])
 
-        if pred == 1:
-            st.error(f"🔴 Probabilité de churn : **{proba*100:.2f}%**")
+        if proba < 0.25:
+            niveau = "Faible"
+            couleur = "🟢"
+        elif proba < 0.55:
+            niveau = "Modéré"
+            couleur = "🟡"
         else:
-            st.success(f"🟢 Client fidèle – Probabilité de churn : **{proba*100:.2f}%**")
+            niveau = "Élevé"
+            couleur = "🔴"
 
-        st.progress(float(proba))
+        st.subheader("Résultat")
+        if pred == 1:
+            st.error(f"{couleur} **Risque de churn ÉLEVÉ : {proba:.2f}**")
+        else:
+            st.success(f"{couleur} **Client fidèle : {proba:.2f}**")
+
+        st.progress(proba)
+
 
 # ============================================================
 # PAGE 2 – VUE DU DATASET
 # ============================================================
+elif page == "👁️ Vue du dataset":
+    st.title("👁️ Exploration du dataset")
 
-elif page == "👀 Vue du dataset":
-    st.title("👀 Exploration du dataset (échantillon 100 000 lignes)")
-    st.dataframe(df_sample.head(500))
+    df = load_data()
 
-    with st.expander("Informations générales"):
-        st.write("Nombre total :", len(df_sample))
-        st.write("Colonnes :", list(df_sample.columns))
-        st.write("Valeurs manquantes :", df_sample.isna().sum())
+    st.markdown(f"Échantillon chargé : **{len(df):,} lignes**")
+
+    st.dataframe(df.head(500))
+
+    st.markdown("### Statistiques générales")
+    st.write(df.describe(include='all'))
+
 
 # ============================================================
-# PAGE 3 – DASHBOARD PRO
+# PAGE 3 – DASHBOARD PREMIUM
 # ============================================================
-
 elif page == "📊 Dashboard":
-    st.title("📊 Dashboard analytique – Churn Expresso")
 
-    # KPIs
-    colA, colB, colC = st.columns(3)
-    colA.metric("Clients total (sample)", f"{len(df_sample):,}")
-    colB.metric("Taux de churn", f"{df_sample['CHURN'].mean()*100:.1f}%")
-    colC.metric(
-        "Revenu moyen churn / non-churn",
-        f"{df_sample[df_sample['CHURN']==1]['REVENUE'].mean():.0f}  /  {df_sample[df_sample['CHURN']==0]['REVENUE'].mean():.0f}"
-    )
+    st.markdown("""
+        <h1 style='text-align:center; color:#1f4e79;'>
+            📊 Dashboard Premium – Churn Expresso
+        </h1>
+    """, unsafe_allow_html=True)
+
+    df = load_data()
+
+    # ================= KPI =================
+    k1, k2, k3 = st.columns(3)
+    k1.metric("Clients total", f"{len(df):,}")
+    k2.metric("Taux de churn", f"{df['CHURN'].mean()*100:.1f} %")
+    k3.metric("Revenu moyen churn", f"{df[df['CHURN']==1]['REVENUE'].mean():.0f}")
 
     st.markdown("---")
 
-    # Churn par région
-    churn_reg = df_sample.groupby("REGION")["CHURN"].mean().sort_values(ascending=False)*100
-    fig1 = px.bar(churn_reg, title="🌍 Taux de churn par région")
+    # =============== Churn par région ===============
+    st.subheader("🌍 Churn par région")
+
+    churn_region = (
+        df.groupby("REGION")["CHURN"].mean().reset_index()
+    )
+    churn_region["CHURN_PCT"] = churn_region["CHURN"] * 100
+
+    fig1 = px.bar(
+        churn_region,
+        x="REGION", y="CHURN_PCT",
+        color="CHURN_PCT",
+        color_continuous_scale="Reds",
+        title="Taux de churn par région"
+    )
     st.plotly_chart(fig1, use_container_width=True)
 
-    # Churn par ancienneté
-    churn_ten = df_sample.groupby("TENURE")["CHURN"].mean()*100
-    fig2 = px.bar(churn_ten, title="📆 Churn par ancienneté")
+    st.markdown("---")
+
+    # =============== Churn par ancienneté (TENURE) ===============
+    st.subheader("⏳ Churn par ancienneté")
+
+    ordre = [
+        "A 1-3 month", "B 3-6 month", "C 6-9 month",
+        "D 9-12 month", "E 12-15 month", "F 15-18 month",
+        "G 18-21 month", "H 21-24 month", "K > 24 month"
+    ]
+    df["TENURE"] = pd.Categorical(df["TENURE"], categories=ordre, ordered=True)
+
+    churn_ten = df.groupby("TENURE")["CHURN"].mean().reset_index()
+    churn_ten["CHURN_PCT"] = churn_ten["CHURN"] * 100
+
+    fig2 = px.line(
+        churn_ten, x="TENURE", y="CHURN_PCT",
+        markers=True,
+        title="Churn selon l’ancienneté",
+    )
+    fig2.update_traces(line=dict(color="#1f4e79", width=4))
     st.plotly_chart(fig2, use_container_width=True)
 
     st.markdown("---")
 
-    # Boxplot Montant
-    fig3 = px.box(
-        df_sample,
-        x="CHURN",
-        y="MONTANT",
-        points="all",
-        title="💰 Montant rechargé selon churn"
+    # =============== Variables importantes ===============
+    st.subheader("📈 Variables les plus liées au churn")
+
+    numeric = df.select_dtypes(include=[np.number])
+    corr = numeric.corr()["CHURN"].sort_values(ascending=False).drop("CHURN").head(10)
+
+    fig3 = px.bar(
+        x=corr.values, y=corr.index,
+        orientation="h",
+        color=corr.values,
+        color_continuous_scale="Blues",
+        title="Top 10 variables corrélées au churn"
     )
     st.plotly_chart(fig3, use_container_width=True)
 
-    # Scatter Data vs Revenue
-    df_scatter = df_sample.sample(20000, random_state=42)
-    fig4 = px.scatter(
-        df_scatter,
-        x="DATA_VOLUME",
-        y="REVENUE",
-        color="CHURN",
-        opacity=0.5,
-        title="📈 Relation Data vs Revenu"
-    )
-    st.plotly_chart(fig4, use_container_width=True)
-
-    # Corrélations
-    numeric_cols = df_sample.select_dtypes(include=[np.number]).columns
-    corr = df_sample[numeric_cols].corr()["CHURN"].sort_values(ascending=False)
-
-    fig5 = px.bar(
-        corr.head(10),
-        title="🔗 Variables les plus corrélées au churn"
-    )
-    st.plotly_chart(fig5, use_container_width=True)
+    st.success("🎉 Dashboard premium affiché avec succès !")
