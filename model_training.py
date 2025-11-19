@@ -13,7 +13,7 @@ import joblib
 # 1. CHARGEMENT DU DATASET (2,1 millions)
 # ----------------------------------------------
 
-df = pd.read_csv("Expresso_churn_dataset.csv")
+df = pd.read_csv("Expresso_churn_sample.csv")
 
 print("Shape du dataset complet :", df.shape)
 print(df.head())
